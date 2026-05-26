@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>AI 营养师 - 你的专属健康美丽顾问</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700;900&family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+
+<!-- Background decorations -->
+<div class="bg-deco"><div class="orb"></div><div class="orb"></div><div class="orb"></div></div>
+<div class="particles">
+  <div class="particle"></div><div class="particle"></div><div class="particle"></div>
+  <div class="particle"></div><div class="particle"></div><div class="particle"></div>
+  <div class="particle"></div><div class="particle"></div>
+</div>
+
+<!-- SVG defs for score gradient -->
+<svg style="position:absolute;width:0;height:0;" aria-hidden="true">
+  <defs>
+    <linearGradient id="scoreGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#FF6B9D"/>
+      <stop offset="100%" stop-color="#C084FC"/>
+    </linearGradient>
+  </defs>
+</svg>
+
+<div class="container">
+
+  <!-- Header -->
+  <header>
+    <div class="logo">
+      <div class="logo-icon">🌸</div>
+      <h1>AI 营养师</h1>
+    </div>
+    <p class="subtitle">你的专属健康美丽顾问</p>
+  </header>
+
+  <!-- Input Section -->
+  <section class="input-section">
+
+    <!-- Card: Basic Info -->
+    <div class="glass input-card">
+      <div class="section-title"><span class="emoji">💫</span> 基本信息</div>
+
+      <div class="field">
+        <div class="field-label"><span>年龄</span><span class="value" id="ageDisplay">25</span></div>
+        <input type="range" id="age" min="14" max="60" value="25" step="1">
+      </div>
+
+      <div class="field">
+        <div class="field-label">
+          <span>身高</span>
+          <span class="value" id="heightDisplay">165 <span style="font-size:14px;background:none;-webkit-text-fill-color:var(--text-light)">cm</span></span>
+        </div>
+        <input type="range" id="height" min="140" max="190" value="165" step="1">
+      </div>
+
+      <div class="field">
+        <div class="field-label">
+          <span>体重</span>
+          <span class="value" id="weightDisplay">55 <span style="font-size:14px;background:none;-webkit-text-fill-color:var(--text-light)">kg</span></span>
+        </div>
+        <input type="range" id="weight" min="35" max="120" value="55" step="0.5">
+      </div>
+    </div>
+
+    <!-- Card: Fitness Goal -->
+    <div class="glass input-card">
+      <div class="section-title"><span class="emoji">🎯</span> 健身目标</div>
+      <div class="goal-grid">
+        <div class="goal-option">
+          <input type="radio" name="goal" id="goalFatLoss" value="fat-loss" checked>
+          <label for="goalFatLoss"><span class="goal-icon">🔥</span>减脂</label>
+        </div>
+        <div class="goal-option">
+          <input type="radio" name="goal" id="goalMuscle" value="muscle-gain">
+          <label for="goalMuscle"><span class="goal-icon">💪</span>增肌</label>
+        </div>
+        <div class="goal-option">
+          <input type="radio" name="goal" id="goalHealth" value="health">
+          <label for="goalHealth"><span class="goal-icon">🌿</span>保持健康</label>
+        </div>
+        <div class="goal-option">
+          <input type="radio" name="goal" id="goalShape" value="shaping">
+          <label for="goalShape"><span class="goal-icon">✨</span>塑形</label>
+        </div>
+      </div>
+    </div>
+
+    <!-- Card: Cycle & Skin -->
+    <div class="glass input-card">
+      <div class="section-title"><span class="emoji">🌸</span> 生理期 &amp; 皮肤</div>
+
+      <div class="field">
+        <div class="field-label" style="margin-bottom:8px"><span>生理期阶段</span></div>
+        <select class="custom-select" id="cycle">
+          <option value="menstrual">🩸 经期（第1-5天）</option>
+          <option value="follicular">🌱 卵泡期（第6-13天）</option>
+          <option value="ovulation">🌸 排卵期（第14-16天）</option>
+          <option value="luteal" selected>🌙 黄体期（第17-28天）</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <div class="field-label" style="margin-bottom:8px"><span>皮肤类型</span></div>
+        <select class="custom-select" id="skinType">
+          <option value="dry">💧 干性皮肤</option>
+          <option value="oily">✨ 油性皮肤</option>
+          <option value="combination" selected>🌓 混合性皮肤</option>
+          <option value="sensitive">🌹 敏感性皮肤</option>
+        </select>
+      </div>
+    </div>
+
+  </section>
+
+  <!-- Generate Button -->
+  <div class="btn-wrap">
+    <button class="generate-btn" id="generateBtn">✨ 生成我的专属方案</button>
+  </div>
+
+  <!-- Loading -->
+  <div class="loading" id="loading">
+    <div class="loading-dots"><span></span><span></span><span></span></div>
+    <p>AI 正在为你定制健康方案...</p>
+  </div>
+
+  <!-- Results -->
+  <section class="results" id="results">
+
+    <!-- Health Score -->
+    <div class="glass result-card">
+      <div class="rc-header"><span class="rc-icon">🏆</span><span class="rc-title">健康评分</span></div>
+      <div class="score-wrap">
+        <div class="score-ring">
+          <svg viewBox="0 0 130 130">
+            <circle class="ring-bg" cx="65" cy="65" r="60"/>
+            <circle class="ring-fg" id="scoreCircle" cx="65" cy="65" r="60"/>
+          </svg>
+          <div class="score-num" id="scoreNum">0</div>
+        </div>
+        <div class="score-label" id="scoreLabel">综合评估中...</div>
+      </div>
+    </div>
+
+    <!-- Calorie & Water -->
+    <div class="glass result-card">
+      <div class="rc-header"><span class="rc-icon">⚡</span><span class="rc-title">热量 &amp; 饮水建议</span></div>
+      <div class="info-grid">
+        <div class="info-item">
+          <div class="ii-value"><span id="calories">0</span> <span class="unit">kcal</span></div>
+          <div class="ii-label">每日建议摄入</div>
+        </div>
+        <div class="info-item">
+          <div class="ii-value" id="bmrDisplay">0 <span class="unit">kcal</span></div>
+          <div class="ii-label">基础代谢</div>
+        </div>
+      </div>
+      <div class="water-bar-wrap">
+        <div class="water-bar-label">
+          <span>💧 每日饮水目标</span>
+          <span><strong id="waterAmount">0</strong> ml</span>
+        </div>
+        <div class="water-bar"><div class="water-bar-fill" id="waterFill"></div></div>
+      </div>
+    </div>
+
+    <!-- Breakfast -->
+    <div class="glass result-card">
+      <div class="rc-header"><span class="rc-icon">🌅</span><span class="rc-title">早餐推荐</span></div>
+      <div class="meal-item" id="breakfastMeal">
+        <div class="mi-header"><span class="mi-name"></span><span class="mi-cals"></span></div>
+        <div class="mi-desc"></div>
+        <div class="mi-tags"></div>
+      </div>
+    </div>
+
+    <!-- Lunch -->
+    <div class="glass result-card">
+      <div class="rc-header"><span class="rc-icon">☀️</span><span class="rc-title">午餐推荐</span></div>
+      <div class="meal-item" id="lunchMeal">
+        <div class="mi-header"><span class="mi-name"></span><span class="mi-cals"></span></div>
+        <div class="mi-desc"></div>
+        <div class="mi-tags"></div>
+      </div>
+    </div>
+
+    <!-- Dinner -->
+    <div class="glass result-card">
+      <div class="rc-header"><span class="rc-icon">🌙</span><span class="rc-title">晚餐推荐</span></div>
+      <div class="meal-item" id="dinnerMeal">
+        <div class="mi-header"><span class="mi-name"></span><span class="mi-cals"></span></div>
+        <div class="mi-desc"></div>
+        <div class="mi-tags"></div>
+      </div>
+    </div>
+
+    <!-- Skincare -->
+    <div class="glass result-card">
+      <div class="rc-header"><span class="rc-icon">💅</span><span class="rc-title">美容养肤建议</span></div>
+      <div class="rc-body">
+        <ul class="skincare-list" id="skincareList"></ul>
+      </div>
+    </div>
+
+    <!-- Encouragement -->
+    <div class="glass result-card">
+      <div class="rc-header"><span class="rc-icon">💌</span><span class="rc-title">AI 的悄悄话</span></div>
+      <div class="encourage-box">
+        <p id="encourageText">每一次为健康做出的选择，都是对未来自己的温柔馈赠。</p>
+        <div class="encourage-author">— 你的 AI 营养师 💕</div>
+      </div>
+    </div>
+
+  </section>
+
+  <div class="footer">以爱之名 · 为健康而生</div>
+</div>
+
+<!-- ═══ Chat UI ═══ -->
+
+<!-- Chat FAB -->
+<button class="chat-fab" id="chatFab" aria-label="打开聊天">
+  💬
+  <span class="fab-badge">1</span>
+</button>
+
+<!-- Chat Overlay -->
+<div class="chat-overlay" id="chatOverlay"></div>
+
+<!-- Chat Panel -->
+<div class="chat-panel" id="chatPanel">
+  <!-- Header -->
+  <div class="chat-header">
+    <div class="chat-header-info">
+      <div class="chat-avatar">🌸</div>
+      <div>
+        <div class="chat-name">AI 营养师 · 小膳</div>
+        <div class="chat-status"><span class="dot"></span> 在线 · 温柔解答中</div>
+      </div>
+    </div>
+    <button class="chat-close" id="chatClose" aria-label="关闭聊天">✕</button>
+  </div>
+
+  <!-- Messages -->
+  <div class="chat-messages" id="chatMessages"></div>
+
+  <!-- Suggestions -->
+  <div class="chat-suggestions" id="chatSuggestions">
+    <button class="suggestion-chip">🥗 减脂期间怎么吃？</button>
+    <button class="suggestion-chip">💧 皮肤干燥吃什么好？</button>
+    <button class="suggestion-chip">🌸 生理期饮食建议</button>
+    <button class="suggestion-chip">✨ 帮我推荐今天的食谱</button>
+  </div>
+
+  <!-- Input -->
+  <div class="chat-input-wrap">
+    <input type="text" class="chat-input" id="chatInput" placeholder="输入你的问题..." autocomplete="off">
+    <button class="chat-send" id="chatSend" aria-label="发送">➤</button>
+  </div>
+</div>
+
+<script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+</html>
