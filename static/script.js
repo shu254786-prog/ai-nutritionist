@@ -354,8 +354,18 @@ function animateNumber(elId, from, to, duration) {
 }
 
 // ═══════════════════════════════════════
-// Chat — 与 DeepSeek 对话
+// Chat — 与 DeepSeek 对话（浏览器直调）
 // ═══════════════════════════════════════
+
+const DEEPSEEK_API_URL = 'https://api.deepseek.com/chat/completions';
+
+const CHAT_SYSTEM_PROMPT = `你是「小膳」，一个温柔专业的AI女性营养师。你是用户专属的健康美丽顾问，以温暖亲切的语气与用户交流，像闺蜜一样贴心。
+
+【你的能力】提供个性化的饮食和营养建议；根据用户的身体数据、健身目标和生理期阶段给出专业饮食指导；推荐适合的食谱和食材搭配；解答美容养肤相关的饮食问题；给予温暖的鼓励和支持。
+
+【回答要求】语气温柔亲切，用中文回答；适当使用颜文字和温馨表情；每条回复控制在200字以内；多鼓励用户，不制造身材焦虑；尊重身体多样性，不推崇极端审美。
+
+【重要原则】不做医学诊断，不替代医生建议；不推荐极端节食；宣扬均衡营养、快乐健康的饮食理念。`;
 
 const chatFab = $('chatFab');
 const chatPanel = $('chatPanel');
@@ -369,6 +379,7 @@ const chatSuggestions = $('chatSuggestions');
 let chatOpen = false;
 let isSending = false;
 let messageHistory = [];
+let apiKey = localStorage.getItem('deepseek_api_key') || '';
 
 // ─── Welcome message ───
 function addWelcomeMessage() {
@@ -376,8 +387,10 @@ function addWelcomeMessage() {
   chatMessages.innerHTML = '';
   appendMessage(
     'ai',
-    '嗨～我是小膳，你的专属 AI 营养师 (◕‿◕✿)\n\n我可以回答你关于健康饮食、营养搭配、美容养肤的问题，也可以根据你的身体情况给建议哦～\n\n想问什么都可以告诉我 💕'
+    '嗨～我是小膳，你的专属 AI 营养师 (◕‿◕✿)\n\n我可以回答你关于健康饮食、营养搭配、美容养肤的问题～\n\n' +
+    (apiKey ? '有什么想问的吗？💕' : '在聊天之前，请先点击右上角的 🔑 按钮设置你的 DeepSeek API 密钥哦～')
   );
+  updateKeyStatus();
 }
 addWelcomeMessage();
 
@@ -411,6 +424,11 @@ async function sendMessage() {
   const text = chatInput.value.trim();
   if (!text || isSending) return;
 
+  if (!apiKey) {
+    appendMessage('ai', '请先点击右上角的 🔑 按钮设置你的 DeepSeek API 密钥～');
+    return;
+  }
+
   chatInput.value = '';
   isSending = true;
   chatSend.disabled = true;
@@ -421,31 +439,59 @@ async function sendMessage() {
   chatSuggestions.style.display = 'none';
   showTyping();
 
+  // Build system message with user context
+  const userInfoStr = [
+    `年龄：${ageSlider.value} 岁`,
+    `身高：${heightSlider.value} cm`,
+    `体重：${weightSlider.value} kg`,
+    `健身目标：${getGoalLabel()}`,
+    `生理期阶段：${getCycleLabel()}`,
+    `皮肤类型：${getSkinLabel()}`,
+  ].join('\n');
+
+  const systemMsg = CHAT_SYSTEM_PROMPT + '\n\n【用户当前信息】\n' + userInfoStr;
+
   try {
-    const res = await fetch('/api/chat', {
+    const res = await fetch(DEEPSEEK_API_URL, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`,
+      },
       body: JSON.stringify({
-        messages: messageHistory.slice(-16),
-        userInfo: {
-          年龄: ageSlider.value + ' 岁',
-          身高: heightSlider.value + ' cm',
-          体重: weightSlider.value + ' kg',
-          健身目标: getGoalLabel(),
-          生理期阶段: getCycleLabel(),
-          皮肤类型: getSkinLabel(),
-        },
+        model: 'deepseek-chat',
+        messages: [
+          { role: 'system', content: systemMsg },
+          ...messageHistory.slice(-16),
+        ],
+        temperature: 0.7,
+        max_tokens: 1000,
+        stream: false,
       }),
     });
 
     hideTyping();
-    const data = await res.json();
 
-    if (data.reply) {
-      appendMessage('ai', data.reply);
-      messageHistory.push({ role: 'assistant', content: data.reply });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      if (res.status === 401 || res.status === 403) {
+        appendMessage('ai', 'API 密钥无效，请检查后重新设置～ 🔑');
+        apiKey = '';
+        localStorage.removeItem('deepseek_api_key');
+        updateKeyStatus();
+      } else {
+        appendMessage('ai', err.error?.message || '小膳暂时有点忙，请稍后再问我吧～💕');
+      }
+      return;
+    }
+
+    const data = await res.json();
+    const reply = data.choices?.[0]?.message?.content;
+    if (reply) {
+      appendMessage('ai', reply);
+      messageHistory.push({ role: 'assistant', content: reply });
     } else {
-      appendMessage('ai', data.error || '唔…小膳暂时没想好怎么回答，换个问题试试？🌸');
+      appendMessage('ai', '唔…小膳暂时没想好怎么回答，换个问题试试？🌸');
     }
   } catch {
     hideTyping();
@@ -521,3 +567,83 @@ function formatMsg(text) {
   html = html.replace(/\n/g, '<br>');
   return html;
 }
+
+// ─── API Key Management ───
+function updateKeyStatus() {
+  const statusEl = document.getElementById('chatStatusText');
+  if (statusEl) {
+    statusEl.textContent = apiKey ? '已接入 DeepSeek 💕' : '未设置 API 密钥';
+  }
+}
+
+// Create API key modal
+const keyModal = document.createElement('div');
+keyModal.className = 'key-modal-overlay';
+keyModal.id = 'keyModal';
+keyModal.innerHTML = `
+  <div class="key-modal">
+    <button class="key-modal-close" id="keyModalClose">✕</button>
+    <div class="key-modal-icon">🔑</div>
+    <div class="key-modal-title">设置 DeepSeek API 密钥</div>
+    <div class="key-modal-desc">输入你的 DeepSeek API Key，密钥仅保存在你浏览器本地，不会上传到任何服务器。</div>
+    <input type="password" class="key-modal-input" id="keyInput" placeholder="sk-..." autocomplete="off">
+    <div style="display:flex;gap:10px;width:100%">
+      <button class="key-modal-btn key-modal-btn-secondary" id="keyClearBtn">清除</button>
+      <button class="key-modal-btn key-modal-btn-primary" id="keySaveBtn">保存</button>
+    </div>
+    <div class="key-modal-foot">没有 Key？<a href="https://platform.deepseek.com" target="_blank" rel="noopener">去 DeepSeek 官网获取</a></div>
+  </div>
+`;
+document.body.appendChild(keyModal);
+
+const keyBtn = document.getElementById('chatKeyBtn');
+const keyModalOverlay = document.getElementById('keyModal');
+const keyInput = document.getElementById('keyInput');
+const keySaveBtn = document.getElementById('keySaveBtn');
+const keyClearBtn = document.getElementById('keyClearBtn');
+const keyModalClose = document.getElementById('keyModalClose');
+
+function openKeyModal() {
+  keyInput.value = apiKey;
+  keyModalOverlay.classList.add('show');
+  setTimeout(() => keyInput.focus(), 200);
+}
+
+function closeKeyModal() {
+  keyModalOverlay.classList.remove('show');
+}
+
+keyBtn.addEventListener('click', openKeyModal);
+keyModalClose.addEventListener('click', closeKeyModal);
+keyModalOverlay.addEventListener('click', (e) => {
+  if (e.target === keyModalOverlay) closeKeyModal();
+});
+
+keySaveBtn.addEventListener('click', () => {
+  const val = keyInput.value.trim();
+  if (!val) {
+    keyInput.style.borderColor = '#FF4D4D';
+    setTimeout(() => { keyInput.style.borderColor = ''; }, 1500);
+    return;
+  }
+  apiKey = val;
+  localStorage.setItem('deepseek_api_key', val);
+  updateKeyStatus();
+  closeKeyModal();
+  appendMessage('ai', '密钥已保存！现在可以问我任何健康饮食的问题啦～ 💕');
+});
+
+keyClearBtn.addEventListener('click', () => {
+  apiKey = '';
+  localStorage.removeItem('deepseek_api_key');
+  keyInput.value = '';
+  updateKeyStatus();
+  closeKeyModal();
+});
+
+keyInput.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') keySaveBtn.click();
+});
+
+// Init key status
+updateKeyStatus();
